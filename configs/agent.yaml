@@ -1,0 +1,12 @@
+agent:
+  client_id: "KH001"
+  token: "CHANGE_ME_LONG_RANDOM_TOKEN_KH001_123456789"
+  gateway_url: "ws://VPS_IP:8443/agent"
+  local_addr: "127.0.0.1:1433"
+  reconnect:
+    min_seconds: 5
+    max_seconds: 30
+  service:
+    name: "M-Tunnel Agent"
+    display_name: "M-Tunnel SQL Tunnel Agent"
+    description: "Reverse tunnel agent for SQL Server"

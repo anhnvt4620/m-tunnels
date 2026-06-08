@@ -1,0 +1,26 @@
+server:
+  agent_listen_addr: "0.0.0.0:8443"
+  agent_path: "/agent"
+  public_bind_addr: "0.0.0.0"
+
+security:
+  min_token_length: 32
+
+port_range:
+  start: 12600
+  end: 12799
+
+database:
+  path: "/app/data/gateway.db"
+
+dashboard:
+  enabled: true
+  listen_addr: "0.0.0.0:8080"
+  basic_auth_user: "admin"
+  # bcrypt hash. Tao bang: ./m-tunnel-gateway-hashpw <password>
+  basic_auth_hash: "$2a$10$REPLACE_WITH_BCRYPT_HASH_OF_YOUR_PASSWORD_HERE_xxxxxx"
+  allowed_ips: []
+
+# Seed clients chi dung lan dau khi DB con rong.
+# Sau do moi thao tac qua dashboard.
+clients: []

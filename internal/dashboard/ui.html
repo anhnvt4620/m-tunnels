@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M-Tunnel Dashboard</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:system-ui,-apple-system,sans-serif;background:#f5f7fa;color:#333;padding:20px;max-width:1200px;margin:0 auto}
+h1{margin-bottom:20px;font-size:1.5rem}
+.bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+button{cursor:pointer;border:none;padding:8px 16px;border-radius:4px;font-size:.875rem}
+.btn-add{background:#2563eb;color:#fff}
+.btn-add:hover{background:#1d4ed8}
+.btn-del{background:#ef4444;color:#fff;padding:4px 10px}
+.btn-del:hover{background:#dc2626}
+.btn-regen{background:#f59e0b;color:#fff;padding:4px 10px}
+.btn-regen:hover{background:#d97706}
+table{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid #e5e7eb;font-size:.85rem}
+th{background:#f9fafb;font-weight:600}
+.online{color:#10b981;font-weight:600}
+.offline{color:#6b7280}
+.modal-bg{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.4);z-index:100}
+.modal{background:#fff;margin:10% auto;padding:24px;border-radius:8px;width:400px;max-width:90%}
+.modal h2{margin-bottom:16px;font-size:1.1rem}
+.modal label{display:block;margin-bottom:4px;font-size:.8rem;font-weight:600}
+.modal input{width:100%;padding:8px;margin-bottom:12px;border:1px solid #d1d5db;border-radius:4px;font-size:.85rem}
+.modal .actions{display:flex;gap:8px;justify-content:flex-end}
+.btn-save{background:#10b981;color:#fff}
+.btn-cancel{background:#6b7280;color:#fff}
+.token-cell{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.token-cell:hover{overflow:visible;white-space:normal;word-break:break-all}
+#msg{margin-bottom:12px;padding:8px 12px;border-radius:4px;display:none;font-size:.85rem}
+#msg.ok{display:block;background:#d1fae5;color:#065f46}
+#msg.err{display:block;background:#fee2e2;color:#991b1b}
+</style>
+</head>
+<body>
+<h1>M-Tunnel Dashboard</h1>
+<div id="msg"></div>
+<div class="bar">
+<span id="count"></span>
+<button class="btn-add" onclick="showAdd()">+ Add Client</button>
+</div>
+<table>
+<thead><tr><th>Client ID</th><th>Display Name</th><th>Port</th><th>Token</th><th>Allowed IPs</th><th>Status</th><th>Traffic</th><th>Actions</th></tr></thead>
+<tbody id="tbody"></tbody>
+</table>
+
+<div class="modal-bg" id="addModal">
+<div class="modal">
+<h2>Add Client</h2>
+<label>Client ID *</label><input id="f_id" placeholder="KH003">
+<label>Display Name</label><input id="f_name" placeholder="Cong ty ABC">
+<label>Allowed IPs (comma separated)</label><input id="f_ips" placeholder="113.20.109.255,10.0.0.1">
+<label>Port (blank = auto)</label><input id="f_port" placeholder="auto" type="number">
+<div class="actions">
+<button class="btn-cancel" onclick="hideAdd()">Cancel</button>
+<button class="btn-save" onclick="doAdd()">Create</button>
+</div>
+</div>
+</div>
+
+<script>
+const API = '/api/clients';
+let clients = [];
+
+function msg(text, ok) {
+  const el = document.getElementById('msg');
+  el.textContent = text;
+  el.className = ok ? 'ok' : 'err';
+  setTimeout(() => el.style.display = 'none', 4000);
+  el.style.display = 'block';
+}
+
+function fmt(b) {
+  if (b > 1e9) return (b/1e9).toFixed(1) + ' GB';
+  if (b > 1e6) return (b/1e6).toFixed(1) + ' MB';
+  if (b > 1e3) return (b/1e3).toFixed(1) + ' KB';
+  return b + ' B';
+}
+
+async function load() {
+  const r = await fetch(API);
+  clients = await r.json();
+  render();
+}
+
+function render() {
+  document.getElementById('count').textContent = clients.length + ' client(s)';
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = clients.map(c => `<tr>
+    <td>${esc(c.id)}</td>
+    <td>${esc(c.display_name)}</td>
+    <td>${c.public_port}</td>
+    <td class="token-cell" title="${esc(c.token)}">${esc(c.token)}</td>
+    <td>${(c.allowed_ips||[]).join(', ')}</td>
+    <td class="${c.online?'online':'offline'}">${c.online?'Online':'Offline'}${c.streams?' ('+c.streams+')':''}</td>
+    <td>${fmt(c.bytes_in)} / ${fmt(c.bytes_out)}</td>
+    <td>
+      <button class="btn-regen" onclick="regen('${esc(c.id)}')">Token</button>
+      <button class="btn-del" onclick="del('${esc(c.id)}')">Del</button>
+    </td>
+  </tr>`).join('');
+}
+
+function esc(s) { return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function showAdd() { document.getElementById('addModal').style.display = 'block'; }
+function hideAdd() { document.getElementById('addModal').style.display = 'none'; }
+
+async function doAdd() {
+  const id = document.getElementById('f_id').value.trim();
+  if (!id) { msg('ID is required', false); return; }
+  const body = {
+    id,
+    display_name: document.getElementById('f_name').value.trim(),
+    allowed_ips: document.getElementById('f_ips').value.split(',').map(s=>s.trim()).filter(Boolean),
+    public_port: parseInt(document.getElementById('f_port').value) || 0
+  };
+  const r = await fetch(API, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  if (!r.ok) { msg(await r.text(), false); return; }
+  hideAdd();
+  document.getElementById('f_id').value = '';
+  document.getElementById('f_name').value = '';
+  document.getElementById('f_ips').value = '';
+  document.getElementById('f_port').value = '';
+  msg('Client created', true);
+  load();
+}
+
+async function del(id) {
+  if (!confirm('Delete client ' + id + '?')) return;
+  const r = await fetch(API + '/' + id, {method:'DELETE'});
+  if (!r.ok) { msg(await r.text(), false); return; }
+  msg('Deleted', true);
+  load();
+}
+
+async function regen(id) {
+  if (!confirm('Regenerate token for ' + id + '? Agent will need new token.')) return;
+  const r = await fetch(API + '/' + id + '/regenerate-token', {method:'POST'});
+  if (!r.ok) { msg(await r.text(), false); return; }
+  msg('Token regenerated', true);
+  load();
+}
+
+load();
+setInterval(load, 5000);
+</script>
+</body>
+</html>

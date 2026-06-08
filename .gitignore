@@ -1,0 +1,29 @@
+# Binaries
+bin/
+*.exe
+
+# SQLite database
+*.db
+
+# Logs
+logs/
+*.log
+
+# Temp
+.tmp-*
+tmp_test/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Go
+/vendor/
+
+# Claude session state (keep settings)
+.claude/state/
+.claude/plans/
